@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>File Upload to Telegram</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+    }
+    .container {
+      border: 1px solid #ccc;
+      padding: 20px;
+      border-radius: 8px;
+      background-color: #f9f9f9;
+    }
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+    input[type="file"] {
+      display: block;
+      margin: 15px 0;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    button[type="submit"] {
+      width: 100%;
+      padding: 10px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    button[type="submit"]:hover {
+      background-color: #0056b3;
+    }
+    #message {
+      margin-top: 15px;
+      padding: 10px;
+      text-align: center;
+      border-radius: 4px;
+      display: none;
+    }
+    .success {
+      background-color: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    .error {
+      background-color: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    #mediaSection {
+      margin-top: 30px;
+      border-top: 2px solid #ccc;
+      padding-top: 20px;
+    }
+    #mediaSection h2 {
+      color: #333;
+      font-size: 18px;
+    }
+    #mediaTable {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+    }
+    #mediaTable thead {
+      background-color: #e9ecef;
+    }
+    #mediaTable th {
+      padding: 12px;
+      text-align: left;
+      font-weight: bold;
+      border-bottom: 2px solid #ccc;
+    }
+    #mediaTable td {
+      padding: 12px;
+      border-bottom: 1px solid #ddd;
+    }
+    #mediaTable tbody tr:hover {
+      background-color: #f5f5f5;
+    }
+    .media-type {
+      display: inline-block;
+      padding: 4px 8px;
+      background-color: #007bff;
+      color: white;
+      border-radius: 3px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+    .download-btn {
+      padding: 6px 12px;
+      background-color: #28a745;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      text-decoration: none;
+      display: inline-block;
+    }
+    .download-btn:hover {
+      background-color: #218838;
+    }
+    #loadingMedia {
+      text-align: center;
+      color: #666;
+      font-size: 14px;
+    }
+    .no-media {
+      text-align: center;
+      color: #999;
+      padding: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Upload File to Telegram</h1>
+    <form id="uploadForm">
+      <input type="file" id="fileInput" multiple required>
+      <button type="submit">Upload</button>
+    </form>
+    <div id="message"></div>
+
+    <div id="mediaSection">
+      <h2>Media in Group</h2>
+      <div id="breadcrumb" style="margin-bottom: 15px; padding: 10px; background-color: #f1f1f1; border-radius: 4px; font-size: 14px;">
+        <span data-dir-id="null" data-dir-name="Root" style="color: #007bff; cursor: pointer;">Root</span>
+      </div>
+      <div style="margin-bottom: 15px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+        <button id="createDirBtn" style="padding: 10px 15px; background-color: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer;">Create Directory</button>
+        <select id="pageSize" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;">
+          <option value="20">20 per page</option>
+          <option value="50">50 per page</option>
+          <option value="100">100 per page</option>
+        </select>
+        <select id="sortBy" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;">
+          <option value="created_at">Sort by Updated Date</option>
+          <option value="file_name">Sort by Name</option>
+          <option value="id">Sort by ID</option>
+        </select>
+        <select id="sortDir" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;">
+          <option value="DESC">Descending</option>
+          <option value="ASC">Ascending</option>
+        </select>
+      </div>
+      <div id="loadingMedia">Loading...</div>
+      <table id="mediaTable" style="display: none;">
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>File Name</th>
+            <th>Date</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="mediaBody"></tbody>
+      </table>
+      <div id="paginationControls" style="margin-top: 15px; display: none; text-align: center;">
+        <button id="prevBtn" style="padding: 8px 15px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 10px;">Previous</button>
+        <span id="pageInfo" style="margin: 0 10px; font-size: 14px;">Page 1</span>
+        <button id="nextBtn" style="padding: 8px 15px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">Next</button>
+      </div>
+      <div id="noMedia" class="no-media" style="display: none;">No media found in group</div>
+    </div>
+  </div>
+
+  <script>
+    // Global state for current directory
+    let currentDir = { id: null, name: 'Root' };
+    
+    // Global state for breadcrumb path
+    let breadcrumbPath = [{ id: null, name: 'Root' }];
+    
+    // Global state for pagination and sorting
+    let pagination = { currentPage: 1, pageSize: 20, totalItems: 0 };
+    let sorting = { orderBy: 'created_at', orderDirection: 'DESC' };
+
+    const form = document.getElementById('uploadForm');
+    const fileInput = document.getElementById('fileInput');
+    const message = document.getElementById('message');
+    const mediaTable = document.getElementById('mediaTable');
+    const mediaBody = document.getElementById('mediaBody');
+    const loadingMedia = document.getElementById('loadingMedia');
+    const noMedia = document.getElementById('noMedia');
+
+    // Initialize breadcrumb display
+    function initBreadcrumb() {
+      updateBreadcrumb();
+    }
+
+    // Load media on page load
+    window.addEventListener('load', () => {
+      initBreadcrumb();
+      fetchMedia();
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const files = fileInput.files;
+      if (files.length === 0) {
+        showMessage('Please select at least one file', 'error');
+        return;
+      }
+
+      let successCount = 0;
+      let failureCount = 0;
+
+      try {
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('parent_id', currentDir.id);
+
+          try {
+            const response = await fetch('/upload', {
+              method: 'POST',
+              body: formData
+            });
+
+            const text = await response.text();
+
+            if (response.ok) {
+              successCount++;
+            } else {
+              failureCount++;
+              console.error(`Failed to upload ${file.name}:`, text);
+            }
+          } catch (err) {
+            failureCount++;
+            console.error(`Error uploading ${file.name}:`, err);
+          }
+        }
+
+        form.reset();
+
+        if (failureCount === 0) {
+          showMessage(`Successfully uploaded ${successCount} file(s)!`, 'success');
+        } else if (successCount === 0) {
+          showMessage(`Failed to upload ${failureCount} file(s)`, 'error');
+        } else {
+          showMessage(`Uploaded ${successCount} file(s), failed ${failureCount}`, 'success');
+        }
+
+        fetchMedia(currentDir.id);
+      } catch (err) {
+        showMessage('Upload failed: ' + err.message, 'error');
+      }
+    });
+
+    function updateBreadcrumb() {
+      const breadcrumb = document.getElementById('breadcrumb');
+      breadcrumb.innerHTML = '';
+      
+      breadcrumbPath.forEach((item, index) => {
+        if (index > 0) {
+          const separator = document.createElement('span');
+          separator.textContent = ' > ';
+          separator.style.margin = '0 5px';
+          separator.style.color = '#666';
+          breadcrumb.appendChild(separator);
+        }
+        
+        const link = document.createElement('span');
+        link.textContent = item.name;
+        link.style.color = '#007bff';
+        link.style.cursor = 'pointer';
+        link.dataset.dirId = item.id === null ? 'null' : item.id;
+        link.dataset.dirName = item.name;
+        
+        link.addEventListener('click', () => {
+          // Remove all items after this one in the breadcrumb
+          breadcrumbPath = breadcrumbPath.slice(0, index + 1);
+          
+          // Update current directory and fetch
+          currentDir = { id: item.id, name: item.name };
+          pagination.currentPage = 1;
+          
+          fetchMedia(currentDir.id, true);
+        });
+        
+        breadcrumb.appendChild(link);
+      });
+    }
+
+    async function fetchMedia(parentId = null, resetPage = true) {
+      try {
+        // Reset pagination when changing directories
+        if (resetPage) {
+          pagination.currentPage = 1;
+        }
+
+        const offset = (pagination.currentPage - 1) * pagination.pageSize;
+        const params = new URLSearchParams({
+          limit: pagination.pageSize,
+          offset: offset,
+          orderBy: sorting.orderBy,
+          orderDirection: sorting.orderDirection
+        });
+
+        if (parentId !== undefined && parentId !== null) {
+          params.append('parent_id', parentId);
+        }
+
+        const response = await fetch(`/files?${params}`);
+        const data = await response.json();
+
+        mediaBody.innerHTML = '';
+        loadingMedia.style.display = 'none';
+        mediaTable.style.display = 'none';
+        noMedia.style.display = 'none';
+        document.getElementById('paginationControls').style.display = 'none';
+        
+        // Update breadcrumb display
+        updateBreadcrumb();
+
+        if (data.length === 0) {
+          noMedia.style.display = 'block';
+          return;
+        }
+
+        mediaTable.style.display = 'table';
+        data.forEach(item => {
+          const row = document.createElement('tr');
+          const date = new Date(item.updated_at).toLocaleString();
+          const fileName = item.file_name || item.file_type;
+          const actionCell = item.type === 'FILE' 
+            ? `<a href="/download/${item.file_id}" class="download-btn" download>Download</a>`
+            : '';
+
+          row.innerHTML = `
+            <td><span class="media-type">${item.file_type?.toUpperCase()}</span></td>
+            <td>${fileName}</td>
+            <td>${date}</td>
+            <td>${actionCell}</td>
+          `;
+          
+          if (item.type === 'DIRECTORY') {
+            row.style.cursor = 'pointer';
+            row.style.backgroundColor = '#f0f0f0';
+            row.addEventListener('mouseenter', () => row.style.backgroundColor = '#e0e0e0');
+            row.addEventListener('mouseleave', () => row.style.backgroundColor = '#f0f0f0');
+            row.addEventListener('click', () => {
+              currentDir = { id: item.id, name: item.file_name };
+              pagination.currentPage = 1; // Reset pagination when changing directories
+              breadcrumbPath.push({ id: item.id, name: item.file_name });
+              updateBreadcrumb();
+              fetchMedia(item.id, true);
+            });
+          }
+          
+          mediaBody.appendChild(row);
+        });
+
+        // Show pagination controls if there are items
+        if (data.length > 0) {
+          document.getElementById('paginationControls').style.display = 'block';
+          document.getElementById('pageInfo').textContent = `Page ${pagination.currentPage}`;
+          
+          // Disable/enable buttons based on page
+          document.getElementById('prevBtn').disabled = pagination.currentPage === 1;
+          document.getElementById('nextBtn').disabled = data.length < pagination.pageSize;
+        }
+      } catch (err) {
+        loadingMedia.textContent = 'Failed to load media';
+        console.error('Error fetching media:', err);
+      }
+    }
+
+    function showMessage(text, type) {
+      message.textContent = text;
+      message.className = type;
+      message.style.display = 'block';
+    }
+
+    const createDirBtn = document.getElementById('createDirBtn');
+    createDirBtn.addEventListener('click', async () => {
+      const dirName = prompt('Enter directory name:');
+      if (!dirName) return;
+
+      try {
+        const response = await fetch('/directories', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            name: dirName,
+            parent_id: currentDir.id
+          })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          showMessage(`Directory "${dirName}" created successfully!`, 'success');
+          fetchMedia(currentDir.id);
+        } else {
+          showMessage('Failed to create directory', 'error');
+        }
+      } catch (err) {
+        showMessage('Error creating directory: ' + err.message, 'error');
+      }
+    });
+
+    // Sorting controls
+    const sortBySelect = document.getElementById('sortBy');
+    const sortDirSelect = document.getElementById('sortDir');
+    
+    sortBySelect.addEventListener('change', (e) => {
+      sorting.orderBy = e.target.value;
+      pagination.currentPage = 1;
+      fetchMedia(currentDir.id, false);
+    });
+
+    sortDirSelect.addEventListener('change', (e) => {
+      sorting.orderDirection = e.target.value;
+      pagination.currentPage = 1;
+      fetchMedia(currentDir.id, false);
+    });
+
+    // Page size controls
+    const pageSizeSelect = document.getElementById('pageSize');
+    pageSizeSelect.addEventListener('change', (e) => {
+      pagination.pageSize = parseInt(e.target.value);
+      pagination.currentPage = 1;
+      fetchMedia(currentDir.id, false);
+    });
+
+    // Pagination controls
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+
+    prevBtn.addEventListener('click', () => {
+      if (pagination.currentPage > 1) {
+        pagination.currentPage--;
+        fetchMedia(currentDir.id, false);
+      }
+    });
+
+    nextBtn.addEventListener('click', () => {
+      pagination.currentPage++;
+      fetchMedia(currentDir.id, false);
+    });
+  </script>
+</body>
+</html>
